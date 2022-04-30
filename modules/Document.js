@@ -240,7 +240,7 @@ class Document{
             )
 
             const new_group = await getGroupType(this.html[index],false) // new group
-            getRowsByPage(pch,height_fix)
+            new_group.addRows(getRowsByPage(pch,height_fix))
             this.pages[this.pages.length-1].addGroups([new_group])  // get the last page of the document
 
           }
@@ -313,16 +313,23 @@ class Document{
             }
 
           }
-
-
   
         })
       )
       .then(response=>{
-        console.log(this.pages);
+        // console.log(this.page_height);
+        // console.log(this.page_width);
+        // console.log(this.pages);
+
+        this.pages.reduce((acc,page)=>{
+          acc+=page.generateHtml()
+          return acc;
+        },'')
+
         response.forEach(group => {
-          console.log(group);
+          // console.log(group);
         });
+        
       })
       .catch(err=>{
 

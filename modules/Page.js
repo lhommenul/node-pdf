@@ -17,4 +17,14 @@ module.exports = class Page{
   addGroups(groups = Group){
     this.groups = groups;
   }
+  generateHtml(){
+  
+    return `
+      <section class="page" data-page-number="${this.page_number}" >
+        ${
+          this.groups.reduce((acc,group)=>acc+=group.generateHtml(),'')
+        }
+      </section>
+    `
+  }
 }
