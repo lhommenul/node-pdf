@@ -9,6 +9,7 @@ class Document{
   html;
   page_height;
   page_width;
+  pages = []
   constructor({
     config = Config
     ,path = undefined
@@ -192,28 +193,31 @@ class Document{
       let pch = this.page_height-margin_page; // page height - ( margin top and bottom )
       let cp = 1;
       
+      this.pages.push( // Add the first page of the document
+        new Page({
+          header : this.config.header
+          ,footer : this.config.footer
+          ,page_number:cp
+          ,start:0
+          ,end:pch
+        })
+      )
+      
       Promise.all(
 
         all_groups.map( async (r,index) => { // Generating new pages
 
           let group_height = r.x+r.height;
-          let group_specifications = 0;
-          let height_fix = 0;
+          let group_specifications = undefined; // If this is a table or an other type of group spec
+          let height_fix = 0; // fix the page size regarding to the margins, table headers ....
           let group_rows = this.html[index].rows;
-          let last_index_row_add_to_a_page = 0;
+          let last_index_row_add_to_a_page = 0; // start the next iterations of rows from this position
 
-          getRowsByPage(pch,0)
+          const new_group = await getGroupType(this.html[index],false) // new group
+          new_group.addRows(getRowsByPage(pch,0)) // add rows to the group
 
-          r.page = [
-            new Page({
-              header : this.html[index].header
-              ,footer : this.html[index].footer
-              ,page_number:cp
-              ,start:0
-              ,end:pch
-            })
-          ];
-  
+          this.pages[this.pages.length-1].addGroups([new_group])  // get the last page of the document
+
           if ( group_height > pch ) await getGroupType(this.html[index])
 
           while ( group_height > pch  ) {
@@ -225,18 +229,19 @@ class Document{
 
             group_height += height_fix // Increase the group height because of the header which will be added + the page config margin 
 
-            
-            getRowsByPage(pch,height_fix)
-
-            r.page.push(
+            this.pages.push( // Add a new page 
               new Page({
-                header : this.html[index].header
-                ,footer : this.html[index].footer
+                header : this.config.header
+                ,footer : this.config.footer
                 ,page_number:cp
                 ,start:pch+1-pch/2
                 ,end:pch
               })
             )
+
+            const new_group = await getGroupType(this.html[index],false) // new group
+            getRowsByPage(pch,height_fix)
+            this.pages[this.pages.length-1].addGroups([new_group])  // get the last page of the document
 
           }
   
@@ -265,23 +270,14 @@ class Document{
 
           }
 
-          async function getGroupType(group) {
+          async function getGroupType(group,get_type = true) {
   
             switch (group.constructor.name) {
               case "Table":
-                
-                const table_header = await page.$(`[data-parent-table="${group.id}"]`); // Get the table header
+              
+                if (get_type) return getTableSpecs()
 
-                const table_header_config = await table_header.evaluate((node) => { // Get the position and the height of the header
-                  
-                  return {
-                    x:node.offsetTop,
-                    height:node.clientHeight
-                  }
-
-                })
-  
-                group_specifications = table_header_config;
+                return createTable(group.header)
 
                 break;
             
@@ -289,12 +285,41 @@ class Document{
                 throw new Error('Unkown group type')
 
             }
-  
+
+
+            async function getTableSpecs() {
+
+              const table_header = await page.$(`[data-parent-table="${group.id}"]`); // Get the table header
+
+              const table_header_config = await table_header.evaluate((node) => { // Get the position and the height of the header
+                
+                return {
+                  x:node.offsetTop,
+                  height:node.clientHeight
+                }
+
+              })
+
+              group_specifications = table_header_config;              
+
+            }
+            async function createTable(group_header) {
+
+              return new Table({
+                id : 151
+                ,header : group_header
+              })
+
+            }
+
           }
+
+
   
         })
       )
       .then(response=>{
+        console.log(this.pages);
         response.forEach(group => {
           console.log(group);
         });
