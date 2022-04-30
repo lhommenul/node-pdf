@@ -11,7 +11,7 @@ const config = new Config({
   ,landscape:false
   ,format:'A4'
   ,margin:{
-    top:50
+    top:0
     ,left:0
     ,right:0 
     ,bottom:0 

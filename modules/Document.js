@@ -3,6 +3,7 @@ const fs = require('fs');
 const Config = require('./Config.js') ;
 const Row = require('./Row.js');
 const Table = require('./Table.js'); 
+const Page = require('./Page.js'); 
 
 class Document{
   html;
@@ -75,7 +76,7 @@ class Document{
 
   }
   #parseContentIntoBody(){
-    console.log(this.config.margin.bottom);
+    
     const content = this.html.reduce((acc,value)=> acc+=value.generateHtml(),'')
     
     return `
@@ -128,11 +129,11 @@ class Document{
       });
 
       const document_height = await page.evaluate(() => document.querySelector('html').offsetHeight);
-      console.log(document_height);
+      // console.log(document_height);
 
       // GET THE POSITION OF ALL ROWS
 
-      const all_rows = await page.evaluate(() => { // Get position of all rows inside the document
+      let all_rows = await page.evaluate(() => { // Get position of all rows inside the document
         let new_list = []
         const rows = document.querySelectorAll('.row')
         
@@ -151,27 +152,27 @@ class Document{
 
       });
 
-      if ( all_rows[all_rows.length-1].x+all_rows[all_rows.length-1].height <= this.page_height ) return console.log("Only on page for this document => the this can be generated");
+      // if ( all_rows[all_rows.length-1].x+all_rows[all_rows.length-1].height <= this.page_height ) return console.log("Only on page for this document => the this can be generated");
 
-      let page_current_height = this.page_height;
-      let current_page = 1;
+      // let page_current_height = this.page_height;
+      // let current_page = 1;
       
-      const i = all_rows.map(r => { // Generating new pages
-        if (r.x+r.height>page_current_height) {
-          page_current_height += page_current_height;
-          current_page+=1;
-        }
-        r.page = current_page;
-        return r;
-      });
+      // const i = all_rows.map(r => { // Generating new pages
+      //   if (r.x+r.height>page_current_height) {
+      //     page_current_height += page_current_height;
+      //     current_page+=1;
+      //   }
+      //   r.page = current_page;
+      //   return r;
+      // });
 
       // GET THE POSITION OF ALL GROUPS
 
 
-      const all_groups = await page.evaluate(() => { 
+      let all_groups = await page.evaluate(() => { 
         let new_list = []
         const groups = document.querySelectorAll('.group')
-        
+      
         for (let index = 0; index < groups.length; index++) {
 
           const r = {
@@ -186,55 +187,130 @@ class Document{
         return new_list
 
       });
-      
-      
-      let margin_page = this.config.margin.top+this.config.margin.bottom;
-      let pch = this.page_height-margin_page;
+
+      let margin_page = this.config.margin.top+this.config.margin.bottom; // Total margin top + bottom
+      let pch = this.page_height-margin_page; // page height - ( margin top and bottom )
       let cp = 1;
+      
+      Promise.all(
 
-      const li = all_groups.map((r,index) => { // Generating new pages
+        all_groups.map( async (r,index) => { // Generating new pages
 
-        let group_height = r.x+r.height;
-        let group_specifications = undefined;
+          let group_height = r.x+r.height;
+          let group_specifications = 0;
+          let height_fix = 0;
+          let group_rows = this.html[index].rows;
+          let last_index_row_add_to_a_page = 0;
 
-        r.page = [cp];
+          getRowsByPage(pch,0)
 
-        if ( group_height > pch ) getGroupType(this.html[index]);
+          r.page = [
+            new Page({
+              header : this.html[index].header
+              ,footer : this.html[index].footer
+              ,page_number:cp
+              ,start:0
+              ,end:pch
+            })
+          ];
+  
+          if ( group_height > pch ) await getGroupType(this.html[index])
 
-        while ( group_height > pch  ) {
+          while ( group_height > pch  ) {
+            
+            pch += this.page_height-margin_page; // Increase the page height
+            cp+=1; // Increase the page number
 
-          pch += pch; // Increase the page height
-          cp+=1; // Increase the page umber
-          r.page.push(cp);
-    
-        }
+            height_fix += group_specifications.height+margin_page
 
-        return r;
-        
-        function getGroupType(group) {
+            group_height += height_fix // Increase the group height because of the header which will be added + the page config margin 
 
-          switch (group.constructor.name) {
-            case "Table":
-              console.log(group);
-              break;
+            
+            getRowsByPage(pch,height_fix)
+
+            r.page.push(
+              new Page({
+                header : this.html[index].header
+                ,footer : this.html[index].footer
+                ,page_number:cp
+                ,start:pch+1-pch/2
+                ,end:pch
+              })
+            )
+
+          }
+  
+          return r;
           
-            default:
-              throw new Error('Unkown group type')
-              break;
+          function getRowsByPage(max_height,fix_height) {
+            const page_height_without_margins = max_height-fix_height;
+            console.log(`=== ${fix_height} / max-height ${page_height_without_margins} ===`);
+            
+            const { page_rows,new_group_rows } = group_rows.reduce((acc,row,index)=> {
+              if ( all_rows[index+last_index_row_add_to_a_page].x+all_rows[index+last_index_row_add_to_a_page].height+fix_height<=page_height_without_margins ) acc.page_rows.push(row);
+              else acc.new_group_rows.push(row)
+              return acc;
+            },{
+              page_rows:[]
+              ,new_group_rows:[]
+            })
+
+            group_rows = new_group_rows;
+
+            last_index_row_add_to_a_page += page_rows.length;
+
+            console.log(`total elements in the page : ${page_rows.length}`);
+
+            return page_rows;
+
           }
 
-        }
+          async function getGroupType(group) {
+  
+            switch (group.constructor.name) {
+              case "Table":
+                
+                const table_header = await page.$(`[data-parent-table="${group.id}"]`); // Get the table header
 
-      });
-      
+                const table_header_config = await table_header.evaluate((node) => { // Get the position and the height of the header
+                  
+                  return {
+                    x:node.offsetTop,
+                    height:node.clientHeight
+                  }
 
-      console.log(li);
+                })
+  
+                group_specifications = table_header_config;
+
+                break;
+            
+              default:
+                throw new Error('Unkown group type')
+
+            }
+  
+          }
+  
+        })
+      )
+      .then(response=>{
+        response.forEach(group => {
+          console.log(group);
+        });
+      })
+      .catch(err=>{
+
+      })
+      .finally(async ()=>{
+        
+        await browser.close();
+      })
+  
       // await page.this({ 
       //   path: 'hn.this'
       //   , format: 'a4' 
       // });
-
-      await browser.close();
 
   }
 
