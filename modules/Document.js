@@ -87,6 +87,8 @@ class Document{
           <meta charset='UTF-8'>
           <meta http-equiv='X-UA-Compatible' content='IE=edge'>
           <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+          <link rel="stylesheet" href="/css/uikit.css">
+          <link rel="stylesheet" href="/css/uikit-rtl.css">
       <title>Document</title>
       </head>
       <body>
@@ -112,11 +114,55 @@ class Document{
     `
 
   }
-  generateHtml(){
+  #regenerateDocument(content){
+    return `
+      <!DOCTYPE html>
+      <html lang='fr'>
+      <head>
+          <meta charset='UTF-8'>
+          <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+          <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+          <link rel="stylesheet" href="/css/uikit.css">
+          <link rel="stylesheet" href="/css/uikit-rtl.css">
+      <title>Document</title>
+      </head>
+      <body>
+          <header>
+                <nav>
+                </nav>
+          </header>
+          <main>
+            ${content}
+          </main>
+          <footer>
+          </footer>
+          <style>
+            body{
+              margin:0;
+            }
+            .page{
+              margin-top:${this.config.margin.top};
+              margin-bottom:${this.config.margin.bottom};
+              margin-left:${this.config.margin.left};
+              margin-right:${this.config.margin.right};
+            }
+            .page:nth-child(1n+1) {
+              background-color: pink;
+            }
+            .page:nth-child(2n+0) {
+              background-color: grey;
+            }
+          </style>
+      </body>
+      </html>
+    `
+  }
+  generateHtml(parse_content = true){
 
     if ( !this.html ) throw new Error('Your html document is empty');
     
-    fs.writeFileSync(this.path,this.#parseContentIntoBody());
+    if ( parse_content ) fs.writeFileSync(this.path,this.#parseContentIntoBody());
+    else  fs.writeFileSync(this.path,this.html);
 
     return this.path;
 
@@ -316,33 +362,33 @@ class Document{
   
         })
       )
-      .then(response=>{
+      .then(async response=>{
         // console.log(this.page_height);
         // console.log(this.page_width);
         // console.log(this.pages);
 
-        this.pages.reduce((acc,page)=>{
+        const content = this.pages.reduce((acc,page)=>{
           acc+=page.generateHtml()
           return acc;
         },'')
 
-        response.forEach(group => {
-          // console.log(group);
+        this.html = this.#regenerateDocument(content)
+        this.generateHtml(false)
+
+        await page.pdf({ 
+          path: 'done.pdf'
+          , format: 'a4' 
         });
-        
+
       })
       .catch(err=>{
-
+        console.error(err);
       })
       .finally(async ()=>{
         
         await browser.close();
       })
   
-      // await page.this({ 
-      //   path: 'hn.this'
-      //   , format: 'a4' 
-      // });
 
   }
 

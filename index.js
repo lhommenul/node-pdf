@@ -24,13 +24,13 @@ const pdf = new Document({
     type:'table'
     ,header:[
       {
-        name:"column"
+        name:"firstname"
       },
       {
-        name:"column2"
+        name:"name"
       },
       {
-        name:"column3"
+        name:"nickname"
       },
     ]
     ,data:example_data

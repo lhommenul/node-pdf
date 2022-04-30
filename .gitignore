@@ -2,8 +2,11 @@
 node_modules
 # DEMO PDF
 hn.pdf
-# DEMO doc html
+done.pdf
+# DEMO doc html / css / js
 index.html
 demo.html
+css
+js
 # DEMO data 
 data.json
