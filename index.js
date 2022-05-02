@@ -1,7 +1,7 @@
 const Document = require('./modules/Document');
 const Config = require('./modules/Config')
 
-const example_data = require('./data.json')
+const example_data = require('./decompte_data.json')
 
 // GENERATE PDF
 

@@ -264,9 +264,10 @@ class Document{
 
           this.pages[this.pages.length-1].addGroups([new_group])  // get the last page of the document
 
+          let count = 0;
           if ( group_height > pch ) await getGroupType(this.html[index])
 
-          while ( group_height > pch  ) {
+          while ( group_height > pch && count < 90 ) {
             
             pch += this.page_height-margin_page; // Increase the page height
             cp+=1; // Increase the page number
@@ -288,7 +289,7 @@ class Document{
             const new_group = await getGroupType(this.html[index],false) // new group
             new_group.addRows(getRowsByPage(pch,height_fix))
             this.pages[this.pages.length-1].addGroups([new_group])  // get the last page of the document
-
+            count++; // infinite loop need to be fixed
           }
   
           return r;
